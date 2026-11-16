@@ -1,0 +1,20 @@
+# 依赖
+node_modules/
+
+# Gradle / Android 构建产物
+android/.gradle/
+android/build/
+android/app/build/
+android/captures/
+android/.idea/
+*.iml
+.gradle/
+local.properties
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+*.log

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0a0a">
+<title>单机传奇 · 1.76复古</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ 启动/职业选择界面 ============ -->
+<div id="start-screen" class="screen active">
+  <div class="start-bg"></div>
+  <div class="start-content">
+    <h1 class="game-title">单 机 传 奇</h1>
+    <p class="game-subtitle">—— 1.76 复古单机 · 沙巴克传说 ——</p>
+    <div class="class-select" id="class-select">
+      <div class="class-card" data-class="warrior">
+        <div class="class-icon warrior-icon">战</div>
+        <h3>战士</h3>
+        <p>近身物理攻击，血厚防高，后期霸道</p>
+        <div class="class-stats">攻 ★★★★★　防 ★★★★★　魔 ★</div>
+      </div>
+      <div class="class-card" data-class="mage">
+        <div class="class-icon mage-icon">法</div>
+        <h3>法师</h3>
+        <p>远程魔法群攻，升级飞快，脆弱需走位</p>
+        <div class="class-stats">攻 ★★　防 ★★　魔 ★★★★★</div>
+      </div>
+      <div class="class-card" data-class="taoist">
+        <div class="class-icon taoist-icon">道</div>
+        <h3>道士</h3>
+        <p>召唤神兽、施毒疗伤，攻守兼备全能</p>
+        <div class="class-stats">攻 ★★★　防 ★★★　魔 ★★★★</div>
+      </div>
+    </div>
+    <div class="name-row">
+      <label>英雄名：</label>
+      <input type="text" id="player-name" maxlength="8" value="传奇勇士" placeholder="请输入角色名">
+    </div>
+    <button id="start-btn" class="big-btn">进 入 传 奇</button>
+    <div class="start-tip">提示：本游戏为单机版，除你之外的角色均为智能机器人</div>
+    <div class="start-actions">
+      <button id="continue-btn" class="small-btn" style="display:none;">继续游戏</button>
+      <button id="new-game-btn" class="small-btn">新的传奇</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 游戏主界面 ============ -->
+<div id="game-screen" class="screen">
+  <div class="game-container">
+    <canvas id="game-canvas"></canvas>
+
+    <!-- 顶部状态栏 -->
+    <div class="top-bar">
+      <div class="player-info">
+        <div class="p-name" id="hud-name">传奇勇士</div>
+        <div class="bar hp-bar"><div class="bar-fill" id="hp-fill"></div><span id="hp-text">100/100</span></div>
+        <div class="bar mp-bar"><div class="bar-fill" id="mp-fill"></div><span id="mp-text">20/20</span></div>
+        <div class="bar exp-bar"><div class="bar-fill" id="exp-fill"></div><span id="exp-text">Lv.1</span></div>
+      </div>
+      <div class="top-right">
+        <div class="map-name" id="hud-map">比奇城</div>
+        <div class="gold-info">金币 <span id="hud-gold">0</span></div>
+        <div class="top-buttons">
+          <button data-panel="inventory" title="背包">背包</button>
+          <button data-panel="equipment" title="装备">装备</button>
+          <button data-panel="skills" title="技能">技能</button>
+          <button data-panel="quests" title="任务">任务</button>
+          <button data-panel="system" title="系统">☰</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快捷技能栏 -->
+    <div class="quick-bar" id="quick-bar"></div>
+
+    <!-- 小地图 -->
+    <div class="minimap-box">
+      <canvas id="minimap" width="150" height="150"></canvas>
+    </div>
+
+    <!-- 聊天/消息框 -->
+    <div class="chat-box" id="chat-box">
+      <div class="chat-lines" id="chat-lines"></div>
+    </div>
+
+    <!-- 目标信息 -->
+    <div class="target-info" id="target-info" style="display:none;"></div>
+
+    <!-- 浮动伤害数字层 -->
+    <div class="float-layer" id="float-layer"></div>
+
+    <!-- 虚拟摇杆（移动端） -->
+    <div class="joystick" id="joystick">
+      <div class="joy-base"><div class="joy-knob" id="joy-knob"></div></div>
+    </div>
+
+    <!-- 动作按钮（移动端） -->
+    <div class="action-buttons">
+      <button class="act-btn atk-btn" id="btn-attack">攻<br>击</button>
+      <button class="act-btn skill-btn" id="btn-skill1">技1</button>
+      <button class="act-btn skill-btn" id="btn-skill2">技2</button>
+      <button class="act-btn pick-btn" id="btn-pick">拾<br>取</button>
+    </div>
+
+    <!-- 面板容器 -->
+    <div class="panel-overlay" id="panel-overlay">
+      <!-- 背包 -->
+      <div class="panel" id="panel-inventory" data-panel="inventory">
+        <div class="panel-header"><span>背包</span><button class="panel-close">×</button></div>
+        <div class="panel-body">
+          <div class="inv-grid" id="inv-grid"></div>
+          <div class="inv-gold">金币：<span id="inv-gold">0</span></div>
+        </div>
+      </div>
+
+      <!-- 装备 -->
+      <div class="panel" id="panel-equipment" data-panel="equipment">
+        <div class="panel-header"><span>角色装备</span><button class="panel-close">×</button></div>
+        <div class="panel-body">
+          <div class="equip-wrap">
+            <div class="equip-slots" id="equip-slots"></div>
+            <div class="equip-stats" id="equip-stats"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 技能 -->
+      <div class="panel" id="panel-skills" data-panel="skills">
+        <div class="panel-header"><span>技能</span><button class="panel-close">×</button></div>
+        <div class="panel-body"><div class="skill-list" id="skill-list"></div></div>
+      </div>
+
+      <!-- 任务 -->
+      <div class="panel" id="panel-quests" data-panel="quests">
+        <div class="panel-header"><span>任务</span><button class="panel-close">×</button></div>
+        <div class="panel-body"><div class="quest-list" id="quest-list"></div></div>
+      </div>
+
+      <!-- 系统 -->
+      <div class="panel" id="panel-system" data-panel="system">
+        <div class="panel-header"><span>系统</span><button class="panel-close">×</button></div>
+        <div class="panel-body system-body">
+          <div class="sys-stat" id="sys-stat"></div>
+          <button class="sys-btn" id="btn-save">保存游戏</button>
+          <button class="sys-btn" id="btn-reset">重新开始</button>
+          <div class="sys-help">
+            <b>操作说明</b><br>
+            · 手机：左侧摇杆移动，右侧按钮攻击/技能<br>
+            · 电脑：WASD移动，点击地面移动，点击怪物攻击<br>
+            · 数字键1-8施放技能，空格拾取<br>
+            · 靠近NPC点击即可对话/接任务
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 对话框（NPC/任务） -->
+    <div class="dialog-box" id="dialog-box" style="display:none;">
+      <div class="dialog-npc" id="dialog-npc">NPC</div>
+      <div class="dialog-text" id="dialog-text"></div>
+      <div class="dialog-options" id="dialog-options"></div>
+      <button class="dialog-close" id="dialog-close">关闭</button>
+    </div>
+
+    <!-- 升级/提示Toast -->
+    <div class="toast" id="toast"></div>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/game.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
