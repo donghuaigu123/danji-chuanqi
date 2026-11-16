@@ -2,9 +2,20 @@
 
 > 一款向经典 1.76 版《热血传奇》致敬的**单机动作 RPG**。全世界只有你一个真实玩家，其余角色全部由 AI 机器人驱动。打怪升级、闯关爆宝、完成任务、强化转生，重现当年通宵沙巴克的热血记忆。
 
-![游戏画面](docs/screenshot-start.png)
+![比奇城](docs/screenshot-world.png)
 
-> 📥 **立即下载 APK**：[danji-chuanqi-v1.0.0.apk](https://github.com/donghuaigu123/danji-chuanqi/releases/download/v1.0.0/danji-chuanqi-v1.0.0.apk) · [Release 页面](https://github.com/donghuaigu123/danji-chuanqi/releases/tag/v1.0.0)
+> 📥 **立即下载 APK**：[danji-chuanqi-v1.0.1.apk](https://github.com/donghuaigu123/danji-chuanqi/releases/download/v1.0.1/danji-chuanqi-v1.0.1.apk) · [Release 页面](https://github.com/donghuaigu123/danji-chuanqi/releases/tag/v1.0.1)
+
+## 🎨 美术设计（v1.0.1 重制）
+
+角色、怪物与场景全部弃用符号化画法，改为**手绘复古像素精灵**，高度还原 2000 年代初《热血传奇》《传奇世界》的 2.5D 观感：
+
+- **角色**：战士/法师/道士均有盔甲、武器、五官细节，4 个朝向 × 2 帧行走动画
+- **怪物**：鸡、鹿、稻草人、半兽人、蜈蚣、僵尸、祖玛卫士、白野猪、血僵尸、赤月恶魔各有独立像素造型
+- **场景**：比奇城石板路 + 中式瓦房 + 灯笼柱，沃玛森林松柏，赤月峡谷墓碑与火把
+- **素材全部由 `tools/gen_assets.py` 程序化绘制生成**，无外部版权图片
+
+![沃玛森林](docs/screenshot-forest.png) ![赤月恶魔](docs/screenshot-boss.png)
 
 ## ✨ 特色玩法
 

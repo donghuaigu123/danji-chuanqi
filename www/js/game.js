@@ -35,6 +35,10 @@
     this.lastSave = now();
     this.botChatTimer = 0;
     this.paused = false;
+    this.sprites = {};       // 精灵图缓存
+    this.tileImg = {};       // 地面贴图缓存
+    this.objects = {};       // 场景物件缓存
+    this._loadAssets();
     this._bindGlobal();
     this._resize();
     window.addEventListener('resize', () => this._resize());
@@ -43,6 +47,38 @@
   }
 
   Game.prototype = {
+    /* ---------- 素材加载 ---------- */
+    _loadAssets() {
+      const load = (key, path, store) => {
+        const img = new Image();
+        img.onload = () => { store[key] = img; };
+        img.src = path;
+        store[key] = img;
+      };
+      // 英雄 3职业 × 4方向 × 2帧
+      ['warrior', 'mage', 'taoist'].forEach(cls => {
+        ['down', 'up', 'left', 'right'].forEach(dir => {
+          [0, 1].forEach(f => {
+            load(`hero_${cls}_${dir}_${f}`, `assets/sprites/hero_${cls}_${dir}_${f}.png`, this.sprites);
+          });
+        });
+      });
+      // 怪物 + NPC + 宠物骷髅
+      const mons = ['skeleton','chicken','deer','orc','scarecrow','centipede','zombie','zumaGuard','zumaArcher','whitePig','redMoonMonster','bloodZombie','chiyueDemon'];
+      mons.forEach(id => load(`mon_${id}`, `assets/sprites/mon_${id}.png`, this.sprites));
+      const npcs = ['elder','weaponShop','potionShop','smith','teleporter','guildMaster'];
+      npcs.forEach(id => load(`npc_${id}`, `assets/sprites/npc_${id}.png`, this.sprites));
+      // 地面 + 墙砖
+      const maps = ['bichi','woma','centipede','zuma','shabak','chiyue'];
+      maps.forEach(id => {
+        load(id, `assets/tiles/${id}.png`, this.tileImg);
+        load(`wall_${id}`, `assets/tiles/wall_${id}.png`, this.tileImg);
+      });
+      // 场景物件
+      const objs = ['pine','tree','house','rock','torch','tomb','fence','lantern'];
+      objs.forEach(id => load(id, `assets/obj/${id}.png`, this.objects));
+    },
+
     /* ---------- 初始化玩家 ---------- */
     newGame(cls, name) {
       const c = D.CLASSES[cls];
@@ -152,11 +188,6 @@
         }
         this.tiles.push(row);
       }
-      // 主城放一些建筑方块（装饰墙）
-      if (m.safe) {
-        for (let y = 6; y < 12; y++) for (let x = 8; x < 15; x++) this.tiles[y][x] = 1;
-        for (let y = 6; y < 12; y++) for (let x = 24; x < 31; x++) this.tiles[y][x] = 1;
-      }
       // NPC 放置
       this.npcs = [];
       if (m.npcs) {
@@ -168,7 +199,64 @@
       }
       // 传送点
       this.portals = (m.portals || []).map(p => ({ ...p, px: p.x * TILE + 20, py: p.y * TILE + 20 }));
+      // 场景装饰物
+      this._genDecor();
       this.spawnMonsters();
+    },
+
+    /* ---------- 场景装饰生成 ---------- */
+    _genDecor() {
+      const m = this.map;
+      this.decor = [];
+      const occupied = (tx, ty, pad) => {
+        pad = pad || 1;
+        for (let y = ty - pad; y <= ty + pad; y++)
+          for (let x = tx - pad; x <= tx + pad; x++)
+            if (this.isWall(x, y)) return true;
+        return false;
+      };
+      const addObj = (type, tx, ty, anchorBottom) => {
+        this.decor.push({ type, x: tx * TILE + 20, y: ty * TILE + (anchorBottom ? TILE : 20) });
+      };
+      if (m.safe) {
+        // 比奇城：两排瓦房 + 灯笼 + 栅栏
+        const houses = [{ x: 11, y: 8 }, { x: 27, y: 8 }, { x: 11, y: 30 }, { x: 27, y: 30 }];
+        houses.forEach(h => {
+          addObj('house', h.x, h.y, true);
+          for (let y = h.y - 1; y <= h.y + 1; y++)
+            for (let x = h.x - 2; x <= h.x + 2; x++)
+              if (x > 0 && y > 0 && x < m.w - 1 && y < m.h - 1) this.tiles[y][x] = 1;
+        });
+        // 灯笼柱沿主路
+        [8, 14, 20, 26, 32].forEach(x => addObj('lantern', x, 14, true));
+        [8, 32].forEach(x => addObj('lantern', x, 20, true));
+      } else if (m.id === 'woma') {
+        // 沃玛森林：松树、阔叶树
+        for (let i = 0; i < 34; i++) {
+          const tx = randInt(2, m.w - 3), ty = randInt(2, m.h - 3);
+          if (!occupied(tx, ty, 1)) addObj(Math.random() < 0.6 ? 'pine' : 'tree', tx, ty);
+        }
+      } else if (m.id === 'chiyue') {
+        // 赤月峡谷：墓碑 + 火把 + 岩石
+        for (let i = 0; i < 14; i++) {
+          const tx = randInt(2, m.w - 3), ty = randInt(2, m.h - 3);
+          if (!occupied(tx, ty, 1)) addObj('tomb', tx, ty);
+        }
+        for (let i = 0; i < 10; i++) {
+          const tx = randInt(2, m.w - 3), ty = randInt(2, m.h - 3);
+          if (!occupied(tx, ty, 1)) addObj('torch', tx, ty);
+        }
+      } else {
+        // 洞穴/寺庙/沙巴克：岩石 + 火把
+        for (let i = 0; i < 18; i++) {
+          const tx = randInt(2, m.w - 3), ty = randInt(2, m.h - 3);
+          if (!occupied(tx, ty, 1)) addObj('rock', tx, ty);
+        }
+        for (let i = 0; i < 8; i++) {
+          const tx = randInt(2, m.w - 3), ty = randInt(2, m.h - 3);
+          if (!occupied(tx, ty, 1)) addObj('torch', tx, ty);
+        }
+      }
     },
 
     isWall(tx, ty) {
@@ -290,11 +378,14 @@
         else this.moveTarget = null;
       }
       const mag = Math.hypot(mx, my);
+      p._vx = 0; p._vy = 0;
       if (mag > 0.05) {
         mx /= mag; my /= mag;
         const spd = this.effSpeed(p) * dt;
+        const ox = p.x, oy = p.y;
         if (this.canMove(p.x + mx * spd, p.y, p.size)) p.x += mx * spd;
         if (this.canMove(p.x, p.y + my * spd, p.size)) p.y += my * spd;
+        p._vx = (p.x - ox) / Math.max(dt, 0.001); p._vy = (p.y - oy) / Math.max(dt, 0.001);
         p.facing = { x: mx, y: my };
         this.moveTarget = null;
       }
@@ -401,12 +492,15 @@
           else if (!m.ranged && pd < 34 && m.atkTimer <= 0) this.monsterAttack(m, prey);
         }
       }
+      m._vx = 0; m._vy = 0;
       if (chase) {
         const d = dist({ x: m.x, y: m.y }, { x: tx, y: ty }) || 1;
         const dx = (tx - m.x) / d, dy = (ty - m.y) / d;
         let spd = m.speed * dt * (m.slowUntil && now() < m.slowUntil ? 0.5 : 1) * 28;
+        const ox = m.x, oy = m.y;
         if (this.canMove(m.x + dx * spd, m.y, m.size)) m.x += dx * spd;
         if (this.canMove(m.x, m.y + dy * spd, m.size)) m.y += dy * spd;
+        m._vx = (m.x - ox) / Math.max(dt, 0.001); m._vy = (m.y - oy) / Math.max(dt, 0.001);
         m.facing = { x: dx, y: dy };
       }
     },
@@ -449,12 +543,15 @@
         if (!b.wanderTarget || dist(b, b.wanderTarget) < 12) b.wanderTarget = this._randomOpenTile();
         tx = b.wanderTarget.x; ty = b.wanderTarget.y; moving = true;
       }
+      b._vx = 0; b._vy = 0;
       if (moving) {
         const d = dist(b, { x: tx, y: ty }) || 1;
         const dx = (tx - b.x) / d, dy = (ty - b.y) / d;
         const spd = b.speed * dt * 26;
+        const ox = b.x, oy = b.y;
         if (this.canMove(b.x + dx * spd, b.y, b.size)) b.x += dx * spd;
         if (this.canMove(b.x, b.y + dy * spd, b.size)) b.y += dy * spd;
+        b._vx = (b.x - ox) / Math.max(dt, 0.001); b._vy = (b.y - oy) / Math.max(dt, 0.001);
         b.facing = { x: dx, y: dy };
       }
       b.hp = Math.min(b.maxHp, b.hp + dt * b.level * 0.5);
@@ -1031,36 +1128,42 @@
       this.cam.y = clamp(targetCamY, 0, Math.max(0, maxY));
       ctx.save();
       ctx.translate(-this.cam.x, -this.cam.y);
-      // 地面
+      // 地面（贴图平铺）
       const m = this.map;
+      const groundImg = this.tileImg[m.id];
+      const wallImg = this.tileImg['wall_' + m.id];
       ctx.fillStyle = m.ground;
       ctx.fillRect(0, 0, m.w * TILE, m.h * TILE);
-      // 网格纹理
-      ctx.strokeStyle = 'rgba(0,0,0,0.13)';
-      ctx.lineWidth = 1;
-      const sx = Math.floor(this.cam.x / TILE), sy = Math.floor(this.cam.y / TILE);
-      const ex = sx + Math.ceil(W / TILE) + 1, ey = sy + Math.ceil(H / TILE) + 1;
-      for (let y = sy; y <= ey && y < m.h; y++) {
-        for (let x = sx; x <= ex && x < m.w; x++) {
-          if (this.tiles[y][x] === 1) {
-            ctx.fillStyle = m.wall;
-            ctx.fillRect(x * TILE, y * TILE, TILE, TILE);
-            ctx.fillStyle = 'rgba(0,0,0,0.25)';
-            ctx.fillRect(x * TILE + 2, y * TILE + 2, TILE - 4, TILE - 4);
-            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
-            ctx.strokeRect(x * TILE + 2.5, y * TILE + 2.5, TILE - 5, TILE - 5);
-          } else {
-            ctx.strokeRect(x * TILE, y * TILE, TILE, TILE);
+      const sx = Math.max(0, Math.floor(this.cam.x / TILE)), sy = Math.max(0, Math.floor(this.cam.y / TILE));
+      const ex = Math.min(m.w, sx + Math.ceil(W / TILE) + 1), ey = Math.min(m.h, sy + Math.ceil(H / TILE) + 1);
+      for (let y = sy; y < ey; y++) {
+        for (let x = sx; x < ex; x++) {
+          const isWall = this.tiles[y][x] === 1;
+          const img = isWall ? wallImg : groundImg;
+          if (isWall) {
+            // 墙体有立体侧面
+            ctx.fillStyle = 'rgba(0,0,0,0.45)';
+            ctx.fillRect(x * TILE, y * TILE + TILE - 8, TILE, 8);
           }
+          if (img && img.complete && img.naturalWidth) ctx.drawImage(img, x * TILE, y * TILE, TILE, TILE);
+          else { ctx.fillStyle = isWall ? m.wall : m.ground; ctx.fillRect(x * TILE, y * TILE, TILE, TILE); }
         }
       }
       // 传送点
       for (const pt of this.portals) this.drawPortal(ctx, pt);
       // 掉落
       for (const d of this.drops) this.drawDrop(ctx, d);
-      // 实体（按y排序）
-      const drawables = [...this.entities].filter(e => e.alive).sort((a, b) => a.y - b.y);
-      for (const e of drawables) this.drawEntity(ctx, e);
+      // 实体 + NPC + 场景物件统一按 y 排序绘制（正确遮挡）
+      const drawables = [
+        ...this.entities.filter(e => e.alive).map(e => ({ kind: 'entity', y: e.y, obj: e })),
+        ...(this.npcs || []).map(n => ({ kind: 'npc', y: n.y, obj: n })),
+        ...(this.decor || []).map(d => ({ kind: 'decor', y: d.y, obj: d }))
+      ].sort((a, b) => a.y - b.y);
+      for (const item of drawables) {
+        if (item.kind === 'entity') this.drawEntity(ctx, item.obj);
+        else if (item.kind === 'npc') this.drawNPC(ctx, item.obj);
+        else this.drawDecor(ctx, item.obj);
+      }
       // 特效
       for (const fx of this.effects) this.drawEffect(ctx, fx);
       ctx.restore();
@@ -1106,89 +1209,119 @@
       ctx.fillText(def.icon, 0, 0);
       ctx.restore();
     },
+    // 绘制场景物件（精灵）
+    drawDecor(ctx, d) {
+      const img = this.objects[d.type];
+      if (!img || !img.complete || !img.naturalWidth) return;
+      const w = img.naturalWidth, h = img.naturalHeight;
+      ctx.drawImage(img, d.x - w / 2, d.y - h, w, h);
+    },
+
+    // 绘制 NPC
+    drawNPC(ctx, n) {
+      ctx.save();
+      ctx.translate(n.x, n.y);
+      // 影子
+      ctx.fillStyle = 'rgba(0,0,0,0.3)';
+      ctx.beginPath(); ctx.ellipse(0, 2, 20, 8, 0, 0, Math.PI * 2); ctx.fill();
+      const img = this.sprites['npc_' + n.id];
+      if (img && img.complete && img.naturalWidth) {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        ctx.drawImage(img, -w / 2, -h + 12, w, h);
+      }
+      // 名字牌
+      ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffe08a'; ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
+      ctx.fillText(n.name, 0, -62);
+      ctx.shadowBlur = 0;
+      // 头顶感叹号提示
+      const bob = Math.sin(now() / 300 + n.x) * 2;
+      ctx.fillStyle = '#ffd23a'; ctx.font = 'bold 15px sans-serif';
+      ctx.fillText('!', 0, -78 + bob);
+      ctx.restore();
+    },
+
     drawEntity(ctx, e) {
-      const bob = Math.sin(e.animT * 8) * 1.5;
+      const moving = (Math.abs(e._vx || 0) + Math.abs(e._vy || 0)) > 0.1;
+      const bob = moving ? Math.sin(e.animT * 10) * 2 : 0;
       ctx.save();
       ctx.translate(e.x, e.y + bob);
       // 影子
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.beginPath(); ctx.ellipse(0, e.size * 0.7, e.size * 0.8, e.size * 0.35, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.32)';
+      ctx.beginPath(); ctx.ellipse(0, e.size * 0.55, e.size * 1.0, e.size * 0.42, 0, 0, Math.PI * 2); ctx.fill();
+
+      if (e.isMonster) this.drawMonster(ctx, e);
+      else this.drawHuman(ctx, e);
+
       // 魔法盾
       if (e.shieldUntil && now() < e.shieldUntil) {
-        ctx.strokeStyle = 'rgba(110,180,255,0.8)'; ctx.lineWidth = 2;
-        ctx.beginPath(); ctx.arc(0, 0, e.size + 8, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = 'rgba(110,180,255,0.85)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(0, -e.size * 0.5, e.size * 1.1, e.size * 1.5, 0, 0, Math.PI * 2); ctx.stroke();
       }
-      if (e.isMonster) this.drawMonster(ctx, e);
-      else if (e.isBot) this.drawHuman(ctx, e, true);
-      else this.drawHuman(ctx, e, false);
+      // 宠物标记
+      if (e.isPet) {
+        ctx.strokeStyle = '#6beb8a'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.ellipse(0, -e.size * 0.3, e.size * 1.0, e.size * 1.2, 0, 0, Math.PI * 2); ctx.stroke();
+      }
       // 血条
       if (e !== this.player || e.hp < this.maxHp(e)) {
         const ratio = clamp(e.hp / (e.maxHp || this.maxHp(e)), 0, 1);
-        const w = e.isBoss ? 60 : (e.size * 2);
-        ctx.fillStyle = '#000'; ctx.fillRect(-w / 2, -e.size - 14, w, 5);
-        ctx.fillStyle = e.isBoss ? '#ff3b3b' : (e.isBot ? '#6beb8a' : '#ff6b5a');
-        ctx.fillRect(-w / 2, -e.size - 14, w * ratio, 5);
+        const w = e.isBoss ? 72 : (e.isMonster ? 38 : 40);
+        const by = -e.size * (e.isBoss ? 3.0 : 2.5) - 6;
+        ctx.fillStyle = '#000'; ctx.fillRect(-w / 2 - 1, by - 1, w + 2, 7);
+        ctx.fillStyle = '#3a1010'; ctx.fillRect(-w / 2, by, w, 5);
+        ctx.fillStyle = e.isBoss ? '#ff3b3b' : (e.isBot ? '#5fd08a' : (e.isPet ? '#6beb8a' : '#e0483a'));
+        ctx.fillRect(-w / 2, by, w * ratio, 5);
       }
       // 名字
-      ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-      ctx.fillStyle = e.isPlayer ? '#ffd75e' : (e.isBot ? '#9fd0ff' : '#e8d8b0');
-      ctx.shadowColor = '#000'; ctx.shadowBlur = 3;
-      ctx.fillText(e.name || (e.def && e.def.name) || '', 0, -e.size - 18);
+      ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'center';
+      ctx.fillStyle = e.isPlayer ? '#ffe08a' : (e.isBot ? '#9fd0ff' : (e.isBoss ? '#ff7a5a' : '#e8d8b0'));
+      ctx.shadowColor = '#000'; ctx.shadowBlur = 4;
+      const label = e.name || (e.def && e.def.name) || '';
+      ctx.fillText(label, 0, -e.size * (e.isBoss ? 3.0 : 2.5) - 10);
+      if (e.isBot && e.guild) {
+        ctx.fillStyle = '#ffb84d'; ctx.font = '9px sans-serif';
+        ctx.fillText('[' + e.guild + ']', 0, -e.size * 2.5 - 22);
+      }
       ctx.shadowBlur = 0;
       ctx.restore();
     },
-    drawHuman(ctx, e, isBot) {
-      const s = e.size;
-      // 身体（袍子）
-      ctx.fillStyle = e.color;
-      ctx.beginPath();
-      ctx.moveTo(0, -s);
-      ctx.lineTo(s * 0.7, s * 0.9);
-      ctx.lineTo(-s * 0.7, s * 0.9);
-      ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1; ctx.stroke();
-      // 头
-      ctx.fillStyle = '#f0c9a0';
-      ctx.beginPath(); ctx.arc(0, -s * 0.7, s * 0.42, 0, Math.PI * 2); ctx.fill();
-      // 职业标识
-      ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      const clsChar = e.cls === 'warrior' ? '战' : e.cls === 'mage' ? '法' : '道';
-      ctx.fillText(clsChar, 0, -s * 0.7);
-      // 武器
-      ctx.strokeStyle = '#d8c9a0'; ctx.lineWidth = 3;
-      const fx = e.facing.x, fy = e.facing.y;
-      ctx.beginPath();
-      ctx.moveTo(s * 0.6, 0);
-      ctx.lineTo(s * 0.6 + fx * s, fy * s);
-      ctx.stroke();
-      if (isBot && e.guild) {
-        ctx.fillStyle = '#ffb84d'; ctx.font = '9px sans-serif';
-        ctx.fillText('[' + e.guild + ']', 0, s + 10);
+
+    // 根据朝向计算方向字符串与行走帧
+    _spriteFrame(e) {
+      const fx = e.facing ? e.facing.x : 0, fy = e.facing ? e.facing.y : 1;
+      let dir;
+      if (Math.abs(fx) > Math.abs(fy)) dir = fx > 0 ? 'right' : 'left';
+      else dir = fy > 0 ? 'down' : 'up';
+      const frame = (Math.floor(e.animT * 6) % 2);
+      return { dir, frame };
+    },
+
+    drawHuman(ctx, e) {
+      const { dir, frame } = this._spriteFrame(e);
+      const key = `hero_${e.cls}_${dir}_${frame}`;
+      let img = this.sprites[key];
+      if (!img || !img.complete || !img.naturalWidth) img = this.sprites[`hero_${e.cls}_down_0`];
+      if (img && img.complete && img.naturalWidth) {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        ctx.drawImage(img, -w / 2, -h + 14, w, h);
+      } else {
+        // 兜底：简单色块
+        ctx.fillStyle = e.color || '#cc8844';
+        ctx.fillRect(-8, -28, 16, 28);
       }
     },
+
     drawMonster(ctx, e) {
-      const s = e.size;
-      const def = e.def;
-      ctx.fillStyle = e.color;
-      if (e.isBoss) {
-        // BOSS 大方块 + 光环
-        ctx.shadowColor = e.color; ctx.shadowBlur = 20;
-        ctx.fillRect(-s / 2, -s / 2, s, s);
-        ctx.shadowBlur = 0;
-        ctx.strokeStyle = '#ffd75e'; ctx.lineWidth = 3; ctx.strokeRect(-s / 2, -s / 2, s, s);
-        ctx.fillStyle = '#fff'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('魔', 0, 0);
+      let key = 'mon_' + e.id;
+      let img = this.sprites[key];
+      if (!img || !img.complete || !img.naturalWidth) img = this.sprites['mon_orc'];
+      if (img && img.complete && img.naturalWidth) {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        ctx.drawImage(img, -w / 2, -h + 12, w, h);
       } else {
-        ctx.beginPath(); ctx.arc(0, 0, s * 0.7, 0, Math.PI * 2); ctx.fill();
-        ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 1.5; ctx.stroke();
-        // 眼睛
-        ctx.fillStyle = def.ranged ? '#ffe45e' : '#fff';
-        ctx.beginPath(); ctx.arc(-s * 0.25, -s * 0.15, 2, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(s * 0.25, -s * 0.15, 2, 0, Math.PI * 2); ctx.fill();
-        if (e.isPet) {
-          ctx.strokeStyle = '#6beb8a'; ctx.lineWidth = 2;
-          ctx.beginPath(); ctx.arc(0, 0, s * 0.9, 0, Math.PI * 2); ctx.stroke();
-        }
+        ctx.fillStyle = e.color || '#aa4444';
+        ctx.fillRect(-e.size, -e.size * 2, e.size * 2, e.size * 2);
       }
     },
     drawEffect(ctx, fx) {
