@@ -4,6 +4,8 @@
 
 ![游戏画面](docs/screenshot-start.png)
 
+> 📥 **立即下载 APK**：[danji-chuanqi-v1.0.0.apk](https://github.com/donghuaigu123/danji-chuanqi/releases/download/v1.0.0/danji-chuanqi-v1.0.0.apk) · [Release 页面](https://github.com/donghuaigu123/danji-chuanqi/releases/tag/v1.0.0)
+
 ## ✨ 特色玩法
 
 - **三职业体系**：战士（近身爆发）、法师（远程群攻）、道士（召唤+治疗+施毒），各有 6 个经典技能
